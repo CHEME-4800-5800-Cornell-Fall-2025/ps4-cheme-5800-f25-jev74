@@ -49,82 +49,77 @@ function solve(model::MySimulatedAnnealingMinimumVariancePortfolioAllocationProb
     α::Float64 = 0.99, β::Float64 = 0.01, τ::Float64 = 0.99,
     μ::Float64 = 1.0, ρ::Float64 = 1.0)
 
-    # initialize -
-    has_converged = false;
+    has_converged = false
 
-    # unpack the model parameters -
-    w = model.w;
-    ḡ = model.ḡ;
-    Σ̂ = model.Σ̂;
-    R = model.R;
+    # unpack
+    w  = model.w
+    ḡ = model.ḡ
+    Σ̂ = model.Σ̂
+    R  = model.R
 
-    # initialize parameters for simulated annealing -
-    T = T₀; # initial T -
-    current_w = w;
-    current_f = _objective_function(current_w, ḡ, Σ̂, R, μ, ρ);
-    
-    # best solution found so far -
-    w_best = current_w;
-    f_best = current_f;
-    KL = K;
+    # make start feasible for barrier + sum constraint
+    w .= max.(w, 1e-12)
+    w ./= sum(w)
 
-    while has_converged == false
-    
-        accepted_counter = 0; 
-        for i in KL
-            potential_w = w + β*randn(length(w))
-            potential_solution_w = _objective_function(potential_w, ḡ, Σ̂, R, μ, ρ);
-            delta_E = potential_solution_w -current_f
-            potential_w = max.(0.0, candidate_w)
-            if delta_E <= 0
-                w_best = potential_w
-                f_best = potential_solution_w
-                accepted_counter += 1;
-            else
-                probability = exp((-(delta_E)/T))
-                if rand() < probability
-                    w_best = potential_w
-                    f_best = potential_solution_w
-                    accepted_counter += 1;
+    # SA state
+    T = T₀
+    current_w = copy(w)
+    current_f = _objective_function(current_w, ḡ, Σ̂, R, μ, ρ)
+    w_best    = copy(current_w)
+    f_best    = current_f
+    KL = K
+
+    while !has_converged
+        accepted_counter = 0
+
+        for _ in 1:KL
+            # propose around current point
+            potential_w = current_w .+ β .* randn(length(current_w))
+
+            # repair BEFORE scoring
+            potential_w .= max.(potential_w, 1e-12)   # strictly positive
+            potential_w ./= sum(potential_w)          # enforce sum=1
+
+            # score candidate (NOTE: ḡ, not ḡ)
+            potential_solution_f = _objective_function(potential_w, ḡ, Σ̂, R, μ, ρ)
+            delta_E = potential_solution_f - current_f
+
+            # accept / reject
+            if (delta_E ≤ 0) || (rand() < exp(-delta_E / T))
+                current_w .= potential_w
+                current_f  = potential_solution_f
+                accepted_counter += 1
+
+                if current_f < f_best
+                    w_best .= current_w
+                    f_best  = current_f
                 end
             end
         end
 
-        # TODO: Implement simulated annealing logic here -
-    
-    
-        #throw(ErrorException("Oooops! Simulated annealing logic not yet implemented!!"));
-
-        # update KL -
-        fraction_accepted = accepted_counter/KL; # what is the fraction of accepted moves
-        
-        # Case 1: we are accepting alot, so decrease the number of iterations
-        if (fraction_accepted > 0.8)
-            KL = ceil(Int, 0.75*KL);
+        # adapt KL
+        fraction_accepted = accepted_counter / KL
+        if fraction_accepted > 0.8
+            KL = ceil(Int, 0.75 * KL)
+        elseif fraction_accepted < 0.2
+            KL = ceil(Int, 1.5 * KL)
         end
 
-        # Case 2: not accepting many moves, so increase the number of iteratons
-        if (fraction_accepted < 0.2)
-            KL = ceil(Int, 1.5*KL);
-        end
+        # update penalties and temperature (geometric)
+        μ *= τ
+        ρ *= τ
 
-        # update penalty parameters and T -
-        μ *= τ*μ;
-        ρ *= τ*ρ;
-
-        if (T ≤ T₁)
-            has_converged = true;
+        if T ≤ T₁
+            has_converged = true
         else
-            T *= (α*T); # Not done yet, so decrease the T -
+            T *= α
         end
     end
 
-    # update the model with the optimal weights -
-    model.w = w_best;
-
-    # return the model -
-    return model;
+    model.w = copy(w_best)
+    return model
 end
+
 
 """
     function solve(problem::MyMarkowitzRiskyAssetOnlyPortfolioChoiceProblem) -> Dict{String,Any}
