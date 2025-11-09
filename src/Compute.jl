@@ -16,7 +16,6 @@ function _objective_function(w::Array{Float64,1}, ḡ::Array{Float64,1},
     # TODO: This version of the objective function does NOT have the barrier term
     # f = w'*(Σ̂*w) + (1/(2*ρ))*((sum(w) - 1.0)^2 + (transpose(ḡ)*w - R)^2);
 
-
     return f;
 end
 
@@ -72,9 +71,29 @@ function solve(model::MySimulatedAnnealingMinimumVariancePortfolioAllocationProb
     while has_converged == false
     
         accepted_counter = 0; 
-        
+        for i in KL
+            potential_w = w + β*randn(length(w))
+            potential_solution_w = _objective_function(potential_w, ḡ, Σ̂, R, μ, ρ);
+            delta_E = potential_solution_w -current_f
+            potential_w = max.(0.0, candidate_w)
+            if delta_E <= 0
+                w_best = potential_w
+                f_best = potential_solution_w
+                accepted_counter += 1;
+            else
+                probability = exp((-(delta_E)/T))
+                if rand() < probability
+                    w_best = potential_w
+                    f_best = potential_solution_w
+                    accepted_counter += 1;
+                end
+            end
+        end
+
         # TODO: Implement simulated annealing logic here -
-        throw(ErrorException("Oooops! Simulated annealing logic not yet implemented!!"));
+    
+    
+        #throw(ErrorException("Oooops! Simulated annealing logic not yet implemented!!"));
 
         # update KL -
         fraction_accepted = accepted_counter/KL; # what is the fraction of accepted moves
