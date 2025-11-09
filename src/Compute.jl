@@ -58,7 +58,7 @@ function solve(model::MySimulatedAnnealingMinimumVariancePortfolioAllocationProb
     R  = model.R
 
     # make start feasible for barrier + sum constraint
-    w .= max.(w, 1e-12)
+    w .= max.(w, 0)
     w ./= sum(w)
 
     # SA state

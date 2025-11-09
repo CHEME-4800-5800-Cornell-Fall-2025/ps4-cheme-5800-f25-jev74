@@ -11,10 +11,10 @@ function _objective_function(w::Array{Float64,1}, ḡ::Array{Float64,1},
 
 
     # TODO: This version of the objective function includes the barrier term, and the penalty terms -
-    f = w'*(Σ̂*w) + (1/(2*ρ))*((sum(w) - 1.0)^2 + (transpose(ḡ)*w - R)^2) - (1/μ)*sum(_safe_log.(w));
+    #f = w'*(Σ̂*w) + (1/(2*ρ))*((sum(w) - 1.0)^2 + (transpose(ḡ)*w - R)^2) - (1/μ)*sum(_safe_log.(w));
 
     # TODO: This version of the objective function does NOT have the barrier term
-    # f = w'*(Σ̂*w) + (1/(2*ρ))*((sum(w) - 1.0)^2 + (transpose(ḡ)*w - R)^2);
+    f = w'*(Σ̂*w) + (1/(2*ρ))*((sum(w) - 1.0)^2 + (transpose(ḡ)*w - R)^2);
 
 
     return f;
@@ -78,7 +78,7 @@ function solve(model::MySimulatedAnnealingMinimumVariancePortfolioAllocationProb
             candidate_w = current_w + β * randn(length(w));
             
             # TODO: If you want to get rid of the barrier term, comment out the next line
-            # candidate_w = max.(0.0, candidate_w); # check non-negativity here, no barriers
+            candidate_w = max.(0.0, candidate_w); # check non-negativity here, no barriers
 
             # compute the objective function at the candidate solution -
             candidate_f = _objective_function(candidate_w, ḡ, Σ̂, R, μ, ρ);
